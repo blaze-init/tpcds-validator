@@ -39,9 +39,9 @@ parse_args_for_spark_submit "$@"
 
 # Resolve a jar location for the TPCDS data generator
 find_resource() {
-  local tpcds_datagen_version=`grep "<version>" "${_DIR}/../pom.xml" | head -n2 | tail -n1 | awk -F '[<>]' '{print $3}'`
+  local validator_version=`grep "<version>" "${_DIR}/../pom.xml" | head -n2 | tail -n1 | awk -F '[<>]' '{print $3}'`
   local scala_version=`grep "<scala.binary.version>" "${_DIR}/../pom.xml" | head -n1 | awk -F '[<>]' '{print $3}'`
-  local jar_file="spark-tpcds-datagen_${scala_version}-${tpcds_datagen_version}-with-dependencies.jar"
+  local jar_file="tpcds-validator_${scala_version}-${validator_version}-with-dependencies.jar"
   local built_jar="$_DIR/../target/${jar_file}"
   if [ -e "$built_jar" ]; then
     RESOURCE=$built_jar
@@ -52,10 +52,17 @@ find_resource() {
 }
 
 find_resource
+LIBSO=/Users/shenyijie/oss/blaze-rs/target/debug/libblaze.dylib
+export LD_LIBRARY_PATH=${LIBSO}:${LD_LIBRARY_PATH}
 
 echo "Using \`spark-submit\` from path: $SPARK_HOME" 1>&2
 exec "${SPARK_HOME}"/bin/spark-submit                                  \
+  --jars /Users/shenyijie/oss/blaze/target/blaze-engine-1.0-SNAPSHOT.jar \
+  --driver-java-options "-Djava.library.path=$JAVA_HOME:/Users/shenyijie/oss/blaze/target/debug/" \
   --class org.apache.spark.sql.execution.benchmark.TPCDSQueryValidator \
+  --conf spark.sql.extensions=org.apache.spark.sql.blaze.BlazeSparkSessionExtension \
+  --conf spark.shuffle.manager=org.apache.spark.sql.blaze.execution.ArrowShuffleManager301 \
+  --conf spark.sql.codegen.wholeStage=false \
   $(join_by " " ${SPARK_CONF[@]})                                      \
   ${RESOURCE}                                                          \
   $(join_by " " ${ARGS[@]})
