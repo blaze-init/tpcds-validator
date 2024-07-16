@@ -19,9 +19,11 @@ package org.apache.spark.sql.execution.benchmark
 
 import java.util.Locale
 
-class TPCDSQueryValidatorArguments(val args: Array[String]) {
-  var dataLocation: String = null
+class TPCDSBenchmarkArgs(val args: Array[String]) {
+  var dataLocation: String = _
+  var outputDir: String = _
   var queryFilter: Set[String] = Set.empty
+  var round: Int = 2
 
   parseArgs(args.toList)
   validateArguments()
@@ -39,36 +41,44 @@ class TPCDSQueryValidatorArguments(val args: Array[String]) {
           dataLocation = value
           args = tail
 
+        case optName :: value :: tail if optionMatch("--output-dir", optName) =>
+          outputDir = value
+          args = tail
+
         case optName :: value :: tail if optionMatch("--query-filter", optName) =>
           queryFilter = value.toLowerCase(Locale.ROOT).split(",").map(_.trim).toSet
           args = tail
 
+        case optName :: value :: tail if optionMatch("--round", optName) =>
+          round = value.toInt
+          args = tail
+
         case _ =>
-          // scalastyle:off println
           System.err.println("Unknown/unsupported param " + args)
-          // scalastyle:on println
           printUsageAndExit(1)
       }
     }
   }
 
   private def printUsageAndExit(exitCode: Int): Unit = {
-    // scalastyle:off
     System.err.println("""
       |Usage: spark-submit --class <this class> <spark sql test jar> [Options]
       |Options:
-      |  --data-location      Path to TPCDS data
-      |  --query-filter       Queries to filter, e.g., q3,q5,q13
-    """.stripMargin)
-    // scalastyle:on
+      |  --data-location Path to TPCDS data
+      |  --output-dir    Output directory for results
+      |  --query-filter  Queries to filter, e.g., q3,q5,q13
+      |  --round         Run each query for a specified number of rounds, default: 2
+      |    """.stripMargin)
     System.exit(exitCode)
   }
 
   private def validateArguments(): Unit = {
     if (dataLocation == null) {
-      // scalastyle:off println
       System.err.println("Must specify a data location")
-      // scalastyle:on println
+      printUsageAndExit(-1)
+    }
+    if (outputDir == null) {
+      System.err.println("Must specify an output dir")
       printUsageAndExit(-1)
     }
   }
